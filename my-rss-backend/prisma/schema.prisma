@@ -1,0 +1,117 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Profile {
+  id          String       @id @default(uuid())
+  name        String
+  avatar      String?
+  categories  Category[]
+  history     ItemStatus[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  preferences Preference[]
+}
+
+model Category {
+  id          String       @id @default(uuid())
+  name        String
+  profileId   String
+  profile     Profile      @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  parentId    String?
+  parent      Category?    @relation("SubCategories", fields: [parentId], references: [id])
+  children    Category[]   @relation("SubCategories")
+  sources     Source[]
+  createdAt   DateTime     @default(now())
+  preferences Preference[]
+  active      Boolean      @default(true)
+}
+
+model Source {
+  id   String @id @default(uuid())
+  name String
+  url  String
+
+  rssUrl String
+
+  type           SourceType @default(RSS)
+  wantVideos     Boolean    @default(true)
+  wantShorts     Boolean    @default(true)
+  wantLives      Boolean    @default(true)
+  active         Boolean    @default(true)
+  lastHttpStatus Int?
+  errorMessage   String?
+  failCount      Int        @default(0)
+  categoryId     String
+  category       Category   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  items          Item[]
+  lastFetch      DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@unique([categoryId, rssUrl])
+}
+
+model Item {
+  id    String @id @default(uuid())
+  title String
+
+  link String
+
+  description String?
+  pubDate     DateTime
+  thumbnail   String?
+  type        ItemType     @default(VIDEO)
+  duration    Int?
+  sourceId    String
+  source      Source       @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  statuses    ItemStatus[]
+  createdAt   DateTime     @default(now())
+
+  @@unique([sourceId, link])
+  @@index([pubDate])
+  @@index([sourceId])
+}
+
+enum ItemType {
+  VIDEO
+  SHORT
+  LIVE
+}
+
+enum SourceType {
+  RSS
+  YOUTUBE
+}
+
+model ItemStatus {
+  id           String   @id @default(uuid())
+  profileId    String
+  profile      Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  itemId       String
+  item         Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  isRead       Boolean  @default(false)
+  playProgress Int      @default(0)
+  isFavorite   Boolean  @default(false)
+  updatedAt    DateTime @updatedAt
+
+  @@unique([profileId, itemId])
+  @@index([profileId, isRead])
+}
+
+model Preference {
+  key        String
+  value      String
+  updatedAt  DateTime  @updatedAt
+  profileId  String
+  profile    Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  category   Category? @relation(fields: [categoryId], references: [id])
+  categoryId String?
+
+  @@id([profileId, key])
+}
